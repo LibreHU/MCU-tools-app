@@ -132,7 +132,7 @@ exportés sont présents : classe `AudioBD37534`). Le registre de chaque écritu
 | 21 / 22 / 23 | graves / médiums / aigus | 0x51 / 0x54 / 0x57 | g = 2·v − 20 dB (v = 0..20) ; g < 0 → `0x80 \| −g` (atténuation), sinon g |
 | 24 | balance / fader | 0x28, 0x29, 0x2A, 0x2B (fader des 4 voies) | voir plus bas |
 | 27 | loudness | `setloudness` (0x75) | |
-| 42 | niveau du caisson | 0x2C (fader caisson) | octet = 0x80 − (base + niveau) → **+niveau dB** ; écrit **seulement si le caisson est activé** |
+| 42 | niveau du caisson | 0x2C (fader caisson) | octet = 0x80 − (base + niveau) ; base = **−5 dB** sur cette carte → niveau 0..12 = **−5..+7 dB** (6 = +1 dB) ; écrit **seulement si le caisson est activé** |
 | **52** | **sortie caisson on/off** | 0x2C puis 0x02 | voir plus bas |
 | 1000..1002 | « EQ » bandes 0/1/2 | 0x57 / 0x54 / 0x51 | **mêmes registres que 23 / 22 / 21** |
 | 1003..1005 | « EQ » bandes 3/4/5 | 0x41 / 0x44 / 0x47 | choix fréquence / Q des filtres graves / médiums / aigus |
@@ -143,9 +143,18 @@ Conséquences : le BD37534 n'a **pas de vrai EQ 6 bandes**. Les « 6 bandes » d
 plus leurs 3 sélecteurs de fréquence/Q. Les filtres caisson 119/120 et les délais par haut-parleur n'existent
 pas sur cette puce.
 
+### Configuration de la carte A0_AN [A]
+`Platform.createConfig()` appelle toujours `identifyBoardTypeAC8257()` : `A0` + 4e caractère `A` →
+**`Platform_AutoChips_8257_37534`** (section `[Audio_A0_AN]` d'`ivi-config.ini`). Cette classe :
+- volume 0..40 sur la courbe `BD37534VolumeCurve` d'`ivi-config.ini` ; la valeur du dump (`-79.0(0)`) est trop
+  courte, donc courbe par défaut : −79, −60, −55, −50 … −14 (pas 10) … 0 (pas 32) … **+5 dB** (pas 40) ;
+- gains d'entrée : canal Android/PC (11) 0 dB, radio (3) et AV/AUX (0) +5 dB ; avec une radio interne,
+  le canal radio est celui d'Android ;
+- **`setSubWooferBaseValue(-5)`** : décalage de −5 dB ajouté au niveau du caisson.
+
 ### Sortie caisson (`setSubWooferOnOff`, id 52)
 - **ON** : mémorise l'état, place le champ « fc du filtre passe-bas caisson » du registre 0x02 à **3**, puis
-  réapplique le niveau (`setSubWoofer` → 0x2C = 0x80 − (base + niveau)), avec une pause de 150 ms.
+  réapplique le niveau (`setSubWoofer` → 0x2C = 0x80 − (base + niveau), base = −5 dB), avec une pause de 150 ms.
 - **OFF** : écrit **0x00 dans 0x2C**, attend 2 × 150 ms (anti-pop), puis remet le champ fc à **0** dans 0x02.
 - Registre 0x02 recomposé à chaque fois : `phase << 7 | champA << 5 | champB << 3 | fc`.
 - D'après une bibliothèque Arduino tierce dérivée de la datasheet ([BD37534FV.h](https://github.com/AnatolyNevzoroff/AMPLIFIER_BD37534FV_TDA7293)),
