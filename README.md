@@ -1,0 +1,35 @@
+# JacMCU — app Android pour le MCU Jancar (UJC201 / AC8257)
+
+Lit l'état du MCU, envoie des commandes et affiche le trafic série. Le protocole est décrit dans
+[`docs/mcu_firmware.md`](../../docs/mcu_firmware.md).
+
+## Modes
+| | Service Jancar (sans root) | Root |
+|---|---|---|
+| Envoi | `ICar.sendPassthroughData` (transaction 20) : ivi-services construit la trame et gère l'ACK | `jacbridge` (via `su`) écrit la trame sur `/dev/ttyS1` en un seul `write()`, sans reconfigurer le port |
+| États | callbacks `ICarCallback` (version, ACC, frein, feux, touches) + getters | trames décodées |
+| Trames brutes | journal `JLOG` d'ivi-services si `READ_LOGS` est accordée | journal `JLOG` via `su logcat` ; option « lecture directe » du port |
+| Spécifique | touches brutes (`setADKey`), capture CAN `0x10` | — |
+
+Le journal d'ivi-services doit être activé (bouton « Activer journal ivi-services », réglage `global_mcudatadebug`).
+En mode service sans root : `adb shell pm grant com.dokt.jacmcu android.permission.READ_LOGS`, puis relancer l'app.
+
+**Lecture directe** (root) : jacbridge lit aussi le port, donc ivi-services ne reçoit plus les octets lus
+(ACC, feux, version...). À réserver à un test court, voiture à l'arrêt.
+
+## Onglets
+- **État** : version, ACC, frein à main, feux, mute, rétroéclairage, antenne, date/heure MCU, dernière touche.
+- **Commandes** : mute, antenne, REM ampli, PWM, LED de façade, seuils de tension, heure, apprentissage des touches,
+  vitesse du boîtier CAN.
+- **Console** : trame hexa libre (`CMD données`, la checksum est ajoutée), requêtes `F0`, journal décodé, export.
+- **Infos** : environnement, état du journal ivi-services, aide.
+
+Sécurité : `80` (bootloader) est bloqué ; `01` (extinction), `0E` (reset SoC) et `F1` (veille) demandent une
+confirmation.
+
+## Build
+```sh
+apps/jacmcu/build.sh            # ANDROID_HOME, ou ANDROID_JAR + AAPT2 + (D8 | DX_JAR)
+```
+Sortie : `apps/jacmcu/out/JacMCU.apk` (arm64, Android 6+, cible API 28). La clé de signature
+`jacmcu.keystore` est créée au premier build et n'est pas versionnée : garder la même pour les mises à jour.
