@@ -1,8 +1,7 @@
 # JacMCU — app Android pour le MCU Jancar (UJC201 / AC8257)
 
 Lit l'état du MCU, envoie des commandes et affiche le trafic série. Le protocole est décrit dans
-[`docs/mcu_firmware.md`](https://github.com/LibreHU/android_device_alps_ac8257_demo/blob/main/docs/mcu_firmware.md)
-du dépôt [android_device_alps_ac8257_demo](https://github.com/LibreHU/android_device_alps_ac8257_demo).
+[`docs/mcu_firmware.md`](docs/mcu_firmware.md).
 
 ## Modes
 | | Service Jancar (sans root) | Root |
@@ -34,3 +33,13 @@ confirmation.
 ```
 Sortie : `out/JacMCU.apk` (arm64, Android 6+, cible API 28). La clé de signature
 `jacmcu.keystore` est créée au premier build et n'est pas versionnée : garder la même pour les mises à jour.
+
+## Reverse engineering du MCU
+- [`docs/mcu_firmware.md`](docs/mcu_firmware.md) : référence complète du MCU (brochage, alimentation, protocole,
+  interfaçage Android, mise à jour, voies de secours).
+- [`tools/mcu/`](tools/mcu) : désassemblage/analyse du firmware (`mdis.py`, `ana.py`, `ana2.py`), `jacmcu.py`
+  (trames, décodage de `/tmp/mcu.log`, moniteur série) et `swd/hk32c030-readonly.cfg` (OpenOCD, lecture seule via
+  un Raspberry Pi 2/3).
+
+Copiés depuis [android_device_alps_ac8257_demo](https://github.com/LibreHU/android_device_alps_ac8257_demo)
+(commit `917417c`), où se trouvent aussi `touchfix` et l'intégration TWRP.
