@@ -1,0 +1,46 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main, "**-LOS"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: SDK Android
+        uses: android-actions/setup-android@v3
+
+      - name: Composants SDK + clang/lld
+        run: |
+          sdkmanager "platforms;android-28" "build-tools;34.0.0"
+          sudo apt-get update
+          sudo apt-get install -y clang lld
+
+      - name: Build (build.sh)
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: ${{ github.ref_name }}-${{ github.run_number }}
+          KS_PASS: android
+        run: ./build.sh
+
+      - name: Artefact APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: JacMCU-${{ github.ref_name }}
+          path: out/JacMCU.apk
+          if-no-files-found: error
