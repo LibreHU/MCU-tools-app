@@ -116,3 +116,59 @@ Constantes des haut-parleurs (`IVIAudio.Speaker`) : FL=0, FR=1, RL=2, RR=3, SWL=
 
 `com.jancar.btservice` et `com.jancar.bluetooth` (uid système) utilisent la **pile Bluetooth Android
 standard** (profils voiture `HeadsetClient`, `A2dpSink`, `PbapClient`), pas de module série dédié.
+
+## 7. Pilote natif du ROHM BD37534 (`libJanCarIVI.so`) [N]
+
+**[N]** = lu par désassemblage de `lib/arm64-v8a/libJanCarIVI.so` (aarch64, « stripped », mais les symboles C++
+exportés sont présents : classe `AudioBD37534`). Le registre de chaque écriture est l'argument
+`I2C::write(registre, &octet, 1, 1)`.
+
+- Puce sur **`/dev/i2c-6`** (`AUDIO_DSP_I2C_INDEX = 6` côté Java), adresse **0x40** (`I2C::open(bus, 0x40)`).
+- `setParam(id, valeur)` est un `switch` sur l'identifiant :
+
+| Id `setParam` | Fonction | Registre(s) BD37534 | Encodage |
+|---|---|---|---|
+| 10, 12, 13 (volumes) | volume principal | 0x20 | octet = 0x80 − dB, bridé à +15 dB |
+| 21 / 22 / 23 | graves / médiums / aigus | 0x51 / 0x54 / 0x57 | g = 2·v − 20 dB (v = 0..20) ; g < 0 → `0x80 \| −g` (atténuation), sinon g |
+| 24 | balance / fader | 0x28, 0x29, 0x2A, 0x2B (fader des 4 voies) | voir plus bas |
+| 27 | loudness | `setloudness` (0x75) | |
+| 42 | niveau du caisson | 0x2C (fader caisson) | octet = 0x80 − (base + niveau) → **+niveau dB** ; écrit **seulement si le caisson est activé** |
+| **52** | **sortie caisson on/off** | 0x2C puis 0x02 | voir plus bas |
+| 1000..1002 | « EQ » bandes 0/1/2 | 0x57 / 0x54 / 0x51 | **mêmes registres que 23 / 22 / 21** |
+| 1003..1005 | « EQ » bandes 3/4/5 | 0x41 / 0x44 / 0x47 | choix fréquence / Q des filtres graves / médiums / aigus |
+| 100..103 | setup graves / médiums / aigus, phase caisson | 0x41 / 0x44 / 0x47 / 0x02 (bit 7) | |
+| autres (dont **119/120 filtres caisson**, délais 33..36) | — | — | ignorés (« unknown param » dans le journal) |
+
+Conséquences : le BD37534 n'a **pas de vrai EQ 6 bandes**. Les « 6 bandes » d'ivi-services sont les 3 gains
+plus leurs 3 sélecteurs de fréquence/Q. Les filtres caisson 119/120 et les délais par haut-parleur n'existent
+pas sur cette puce.
+
+### Sortie caisson (`setSubWooferOnOff`, id 52)
+- **ON** : mémorise l'état, place le champ « fc du filtre passe-bas caisson » du registre 0x02 à **3**, puis
+  réapplique le niveau (`setSubWoofer` → 0x2C = 0x80 − (base + niveau)), avec une pause de 150 ms.
+- **OFF** : écrit **0x00 dans 0x2C**, attend 2 × 150 ms (anti-pop), puis remet le champ fc à **0** dans 0x02.
+- Registre 0x02 recomposé à chaque fois : `phase << 7 | champA << 5 | champB << 3 | fc`.
+- D'après une bibliothèque Arduino tierce dérivée de la datasheet ([BD37534FV.h](https://github.com/AnatolyNevzoroff/AMPLIFIER_BD37534FV_TDA7293)),
+  fc = 0/1/2/3/4 → OFF / 55 / 85 / **120 Hz** / 160 Hz : le caisson est donc filtré en **passe-bas fixe à 120 Hz**.
+  La position exacte des autres champs (sortie caisson, mesure de niveau) diffère entre cette bibliothèque et
+  le code Jancar, et la datasheet officielle n'a pas pu être consultée : **à vérifier**.
+- La valeur **0x00 écrite dans 0x2C** est hors de la plage +15..−79 dB de cette bibliothèque (0x71..0xCF) :
+  coupure probable, **non vérifiée**.
+
+### Balance / fader (`setBalanceFade`, id 24)
+- Entrées 0..60 (30 = centre), bridées à 60. Pour chaque haut-parleur, un indice 0..30 est calculé
+  (30 = plein volume ; on retire la distance `sqrt(dx² + dy²)` au haut-parleur opposé à la direction choisie).
+- Indice → dB par une table : 0 → −79, 1 → −60, 2 → −50, 3 → −40, 4 → −37, 5 → −34, 6 → −29, 7 → −26, 8 → −23,
+  9..28 → −20..−1 dB, 29 → 0 dB, 30 → +1 dB.
+- Écrit dans 0x28, 0x29, 0x2A, 0x2B (fader avant 1, avant 2, arrière 1, arrière 2). La puce sait régler ces
+  4 voies **indépendamment**, mais ivi-services ne l'expose qu'à travers balance/fader.
+
+### `setChipParam` (transaction 51) sur BD37534
+Trois commandes seulement : 10 → gain d'entrée (0x06), 14 → décalage du volume, 42 → gain caisson. **Pas
+d'écriture de registre arbitraire.**
+
+### Pistes
+- En root, un client peut écrire directement sur `/dev/i2c-6` @0x40 pour ce qu'ivi-services n'expose pas
+  (niveau de chaque haut-parleur, fc du caisson 55/85/160 Hz, phase). ivi-services réécrit ces registres à
+  chaque changement de balance ou de caisson : il faut les réappliquer après lui.
+- Sur une ROM sans ivi-services (LineageOS), cette table suffit pour écrire un pilote du BD37534.
