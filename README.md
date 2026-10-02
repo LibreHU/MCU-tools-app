@@ -22,6 +22,10 @@ En mode service sans root : `adb shell pm grant com.dokt.jacmcu android.permissi
 - **Commandes** : mute, antenne, REM ampli, PWM, LED de façade, seuils de tension, heure, apprentissage des touches,
   vitesse du boîtier CAN.
 - **Console** : trame hexa libre (`CMD données`, la checksum est ajoutée), requêtes `F0`, journal décodé, export.
+- **Simulation** : injecte *localement* des trames MCU → SoC (ACC, frein, feux, touches volant, version/heure,
+  séquence de démarrage `PC_READY`, trame libre) dans le décodeur et le journal, sans rien écrire sur `/dev/ttyS1`.
+  Pour tester l'interface et le décodage sans la voiture. Les vrais ACC / frein / feux sont lus par le MCU sur ses
+  broches (voir `docs/mcu_firmware.md` §3) : ils ne se simulent pas par la liaison série.
 - **Infos** : environnement, état du journal ivi-services, aide.
 
 Sécurité : `80` (bootloader) est bloqué ; `01` (extinction), `0E` (reset SoC) et `F1` (veille) demandent une

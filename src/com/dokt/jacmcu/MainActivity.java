@@ -41,16 +41,17 @@ import java.util.Locale;
 import java.util.Map;
 
 public final class MainActivity extends Activity implements Backend.Listener {
-    static final int BG = 0xFF101418, CARD = 0xFF1C232B, ACCENT = 0xFF3FA7F5, OK = 0xFF4CC38A, BAD = 0xFFE5534B,
-            WARN = 0xFFE3A008, TXT = 0xFFE6EDF3, DIM = 0xFF8B98A5;
+    static final int BG = 0xFF0E1216, CARD = 0xFF1A2027, CARD_HI = 0xFF232C36, ACCENT = 0xFF4DA3FF,
+            OK = 0xFF46D39A, BAD = 0xFFF2645A, WARN = 0xFFF0A92B, TXT = 0xFFEAF0F6, DIM = 0xFF8A98A6,
+            SIM = 0xFFB98AF0;
 
     private final Handler ui = new Handler(Looper.getMainLooper());
     private SharedPreferences prefs;
     private Backend backend;
     private TextView status, logView, preview, infoView;
     private ScrollView logScroll;
-    private final View[] pages = new View[4];
-    private final Button[] tabs = new Button[4];
+    private final View[] pages = new View[5];
+    private final Button[] tabs = new Button[5];
     private Button modeService, modeRoot;
     private CheckBox direct, hideAck, pause;
     private final Map<String, TextView> tiles = new LinkedHashMap<String, TextView>();
@@ -153,7 +154,19 @@ public final class MainActivity extends Activity implements Backend.Listener {
     private void setState(String k, String v) {
         state.put(k, v);
         TextView t = tiles.get(k);
-        if (t != null) t.setText(v);
+        if (t != null) { t.setText(v); t.setTextColor(tileColor(k, v)); }
+    }
+
+    /** Couleur d'une valeur d'etat : vert = actif/present, rouge = coupe/perdu, ambre = attention. */
+    private int tileColor(String k, String v) {
+        if (v == null || v.equals("--")) return TXT;
+        if (("acc".equals(k) || "radio".equals(k)) && v.equals("ON")) return OK;
+        if (("acc".equals(k) || "radio".equals(k)) && v.equals("OFF")) return DIM;
+        if ("ill".equals(k)) return v.equals("ON") ? WARN : DIM;
+        if ("hb".equals(k)) return v.equals("serre") ? OK : WARN;
+        if ("mute".equals(k)) return v.equals("coupe") ? BAD : OK;
+        if ("key".equals(k)) return ACCENT;
+        return TXT;
     }
 
     // ================================================================== envoi
@@ -243,9 +256,14 @@ public final class MainActivity extends Activity implements Backend.Listener {
         root.setPadding(dp(12), dp(8), dp(12), dp(8));
 
         LinearLayout top = hrow();
+        top.setBackgroundDrawable(round(CARD, 14));
+        top.setPadding(dp(14), dp(8), dp(14), dp(8));
+        LinearLayout brand = vcol();
         TextView title = text("JacMCU", 22, TXT);
         title.setTypeface(Typeface.DEFAULT_BOLD);
-        top.addView(title, new LinearLayout.LayoutParams(-2, -2));
+        brand.addView(title);
+        brand.addView(text("MCU Jancar / AC8257", 11, DIM));
+        top.addView(brand, new LinearLayout.LayoutParams(-2, -2));
         modeService = button("Service Jancar", new View.OnClickListener() { public void onClick(View v) { startBackend("service"); } });
         modeRoot = button("Root", new View.OnClickListener() { public void onClick(View v) { startBackend("root"); } });
         top.addView(space(16)); top.addView(modeService); top.addView(modeRoot);
@@ -264,8 +282,8 @@ public final class MainActivity extends Activity implements Backend.Listener {
         root.addView(top);
 
         LinearLayout tabRow = hrow();
-        String[] names = {"Etat", "Commandes", "Console", "Infos"};
-        for (int i = 0; i < 4; i++) {
+        String[] names = {"Etat", "Commandes", "Console", "Simulation", "Infos"};
+        for (int i = 0; i < tabs.length; i++) {
             final int k = i;
             tabs[i] = button(names[i], new View.OnClickListener() { public void onClick(View v) { selectTab(k); } });
             tabRow.addView(tabs[i], new LinearLayout.LayoutParams(0, -2, 1));
@@ -273,7 +291,7 @@ public final class MainActivity extends Activity implements Backend.Listener {
         root.addView(tabRow);
 
         FrameLayout content = new FrameLayout(this);
-        pages[0] = pageState(); pages[1] = pageCommands(); pages[2] = pageConsole(); pages[3] = pageInfo();
+        pages[0] = pageState(); pages[1] = pageCommands(); pages[2] = pageConsole(); pages[3] = pageSimu(); pages[4] = pageInfo();
         for (View p : pages) content.addView(p, new FrameLayout.LayoutParams(-1, -1));
         root.addView(content, new LinearLayout.LayoutParams(-1, 0, 1));
         return root;
@@ -281,11 +299,14 @@ public final class MainActivity extends Activity implements Backend.Listener {
 
     private void selectTab(int k) {
         prefs.edit().putInt("tab", k).apply();
-        for (int i = 0; i < 4; i++) {
-            pages[i].setVisibility(i == k ? View.VISIBLE : View.GONE);
-            tabs[i].setBackgroundDrawable(pill(i == k ? ACCENT : CARD));
+        for (int i = 0; i < tabs.length; i++) {
+            boolean sel = i == k;
+            pages[i].setVisibility(sel ? View.VISIBLE : View.GONE);
+            tabs[i].setBackgroundDrawable(pill(sel ? ACCENT : CARD));
+            tabs[i].setTextColor(sel ? 0xFF0E1216 : TXT);
+            tabs[i].setTypeface(sel ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
         }
-        if (k == 3) refreshInfo();
+        if (k == tabs.length - 1) refreshInfo();
     }
 
     private View pageState() {
@@ -471,6 +492,95 @@ public final class MainActivity extends Activity implements Backend.Listener {
         byte[] f = Frame.build(b[0] & 0xFF, Frame.slice(b, 1, b.length));
         String w = Frame.forbidden(b[0] & 0xFF) ? "   BLOQUE" : Frame.danger(b[0] & 0xFF) != null ? "   confirmation demandee" : "";
         preview.setText("trame : " + Frame.hex(f) + "   " + Frame.describe(f, false) + w);
+    }
+
+    // ================================================================== simulation (local)
+    /** Injecte une trame MCU -> SoC synthetique dans le decodeur et le journal de l'app. N'ecrit RIEN sur le port. */
+    private void simulate(int cmd, int... data) {
+        byte[] d = new byte[data.length];
+        for (int i = 0; i < data.length; i++) d[i] = (byte) data[i];
+        onFrame(true, Frame.build(cmd, d), "SIM");
+    }
+
+    private void simulateBytes(int cmd, byte[] d) { onFrame(true, Frame.build(cmd, d), "SIM"); }
+
+    private View pageSimu() {
+        LinearLayout p = vcol();
+        p.addView(note("Simulation locale : les trames ci-dessous sont injectees dans le decodeur et le journal de "
+                + "l'app comme si le MCU les avait envoyees. Rien n'est ecrit sur /dev/ttyS1 : c'est pour tester "
+                + "l'interface et le decodage sans la voiture. Les vrais ACC / frein / feux sont lus par le MCU sur "
+                + "ses broches : ils ne peuvent pas etre simules par la liaison serie."));
+
+        p.addView(section("Etats vehicule"));
+        p.addView(row("ACC (00)", simBtn("Present", 0x00, 1), simBtn("Coupe", 0x00, 0)));
+        p.addView(row("Frein a main (04)", simBtn("Serre", 0x04, 1), simBtn("Desserre", 0x04, 0)));
+        p.addView(row("Feux / ILL (0B)", simBtn("ON", 0x0B, 1), simBtn("OFF", 0x0B, 0)));
+        p.addView(row("Mute (08)", simBtn("Coupe", 0x08, 1), simBtn("Actif", 0x08, 0)));
+        p.addView(row("Antenne radio (43)", simBtn("ON", 0x43, 1), simBtn("OFF", 0x43, 0)));
+
+        p.addView(section("Touches volant (20)"));
+        p.addView(row("KEY1 (canal 5)", simBtn("Appui", 0x20, 5, 0xAA, 0x30, 0x30, 0x30),
+                simBtn("Relache", 0x20, 5, 0xAA, 0xFF, 0xFF, 0xFF)));
+        p.addView(row("KEY2 (canal 6)", simBtn("Appui", 0x20, 6, 0xAA, 0x28, 0x28, 0x28),
+                simBtn("Relache", 0x20, 6, 0xAA, 0xFF, 0xFF, 0xFF)));
+
+        p.addView(section("Sequences"));
+        p.addView(row("Demarrage (PC_READY)", button("Rejouer", new View.OnClickListener() {
+            public void onClick(View v) { simBoot(); }
+        })));
+        p.addView(row("Version + heure", button("Injecter", new View.OnClickListener() {
+            public void onClick(View v) { simVersionTime(); }
+        })));
+
+        p.addView(section("Trame libre"));
+        LinearLayout r = hrow();
+        final EditText in = new EditText(this);
+        in.setHint("CMD donnees... ex : 0B 01");
+        in.setTextColor(TXT); in.setHintTextColor(DIM);
+        in.setTypeface(Typeface.MONOSPACE);
+        in.setSingleLine(true);
+        in.setText("0B 01");
+        r.addView(in, new LinearLayout.LayoutParams(0, -2, 1));
+        r.addView(button("Injecter", new View.OnClickListener() {
+            public void onClick(View v) {
+                byte[] b = Frame.parseHex(in.getText().toString());
+                if (b == null || b.length == 0) { toast("hexa invalide"); return; }
+                if (b.length - 1 > Frame.MAX_DATA) { toast("trop long"); return; }
+                simulateBytes(b[0] & 0xFF, Frame.slice(b, 1, b.length));
+            }
+        }));
+        p.addView(r);
+        p.addView(note("Astuce : l'onglet Console permet d'exporter le journal, melant trames reelles et simulees."));
+        return scroll(p);
+    }
+
+    private Button simBtn(String s, final int cmd, final int... data) {
+        Button b = button(s, new View.OnClickListener() { public void onClick(View v) { simulate(cmd, data); } });
+        b.setBackgroundDrawable(pill(0xFF2A2436));
+        return b;
+    }
+
+    /** Rejoue la sequence de demarrage du doc (section 5) : ACC, puis version +200 ms, puis date/heure +400 ms. */
+    private void simBoot() {
+        addLog("== simulation : demarrage (PC_READY)");
+        simulate(0x00, 1);
+        ui.postDelayed(new Runnable() { public void run() { simVersion(); } }, 200);
+        ui.postDelayed(new Runnable() { public void run() { simTime(); } }, 400);
+        toast("sequence de demarrage injectee");
+    }
+
+    private void simVersionTime() { simVersion(); simTime(); }
+
+    private void simVersion() {
+        byte[] d = "JCST_AC8257_8T7-2024.08.09_12:59".getBytes();
+        simulateBytes(0x0A, d);
+    }
+
+    private void simTime() {
+        Calendar c = Calendar.getInstance();
+        int y = c.get(Calendar.YEAR);
+        simulate(0x09, 0, y / 100, y % 100, c.get(Calendar.MONTH) + 1, c.get(Calendar.DAY_OF_MONTH));
+        simulate(0x09, 1, c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE), c.get(Calendar.SECOND));
     }
 
     private View pageInfo() {
