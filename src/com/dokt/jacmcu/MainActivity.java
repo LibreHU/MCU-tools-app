@@ -493,7 +493,7 @@ public final class MainActivity extends Activity implements Backend.Listener {
                 + "Root : jacbridge ecrit chaque trame sur /dev/ttyS1 en un seul write(), sans reconfigurer le port ; la "
                 + "lecture passe par le journal d'ivi-services (passif). La lecture directe du port prive ivi-services des "
                 + "octets lus : a reserver a un test court.\n\n"
-                + "Protocole : EE FA LEN CMD donnees CS (docs/mcu_firmware.md du depot)."));
+                + "Protocole : EE FA LEN CMD donnees CS (docs/mcu_firmware.md du depot LibreHU/android_device_alps_ac8257_demo)."));
         return scroll(p);
     }
 

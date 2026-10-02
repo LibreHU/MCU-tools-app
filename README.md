@@ -1,7 +1,8 @@
 # JacMCU — app Android pour le MCU Jancar (UJC201 / AC8257)
 
 Lit l'état du MCU, envoie des commandes et affiche le trafic série. Le protocole est décrit dans
-[`docs/mcu_firmware.md`](../../docs/mcu_firmware.md).
+[`docs/mcu_firmware.md`](https://github.com/LibreHU/android_device_alps_ac8257_demo/blob/main/docs/mcu_firmware.md)
+du dépôt [android_device_alps_ac8257_demo](https://github.com/LibreHU/android_device_alps_ac8257_demo).
 
 ## Modes
 | | Service Jancar (sans root) | Root |
@@ -29,7 +30,7 @@ confirmation.
 
 ## Build
 ```sh
-apps/jacmcu/build.sh            # ANDROID_HOME, ou ANDROID_JAR + AAPT2 + (D8 | DX_JAR)
+./build.sh                    # ANDROID_HOME, ou ANDROID_JAR + AAPT2 + (D8 | DX_JAR)
 ```
-Sortie : `apps/jacmcu/out/JacMCU.apk` (arm64, Android 6+, cible API 28). La clé de signature
+Sortie : `out/JacMCU.apk` (arm64, Android 6+, cible API 28). La clé de signature
 `jacmcu.keystore` est créée au premier build et n'est pas versionnée : garder la même pour les mises à jour.
