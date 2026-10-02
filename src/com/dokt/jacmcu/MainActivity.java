@@ -49,6 +49,8 @@ public final class MainActivity extends Activity implements Backend.Listener {
     private SharedPreferences prefs;
     private Backend backend;
     private TextView status, logView, preview, infoView;
+    private String lastStatusText = "";
+    private boolean lastStatusOk;
     private ScrollView logScroll;
     private final View[] pages = new View[5];
     private final Button[] tabs = new Button[5];
@@ -120,11 +122,37 @@ public final class MainActivity extends Activity implements Backend.Listener {
     public void onStatus(final String text, final boolean ok) {
         ui.post(new Runnable() {
             public void run() {
-                status.setText((ok ? "● " : "○ ") + text);
-                status.setTextColor(ok ? OK : WARN);
+                lastStatusText = text;
+                lastStatusOk = ok;
+                ui.removeCallbacks(restoreStatus);
+                restoreStatus.run();
                 addLog("# " + text);
             }
         });
+    }
+
+    /** Retablit le statut de connexion apres un message temporaire. */
+    private final Runnable restoreStatus = new Runnable() {
+        public void run() {
+            if (status == null) return;
+            status.setText((lastStatusOk ? "● " : "○ ") + lastStatusText);
+            status.setTextColor(lastStatusOk ? OK : WARN);
+        }
+    };
+
+    /** Message de statut bref (retour tactile a l'appui d'un bouton), puis retour au statut de connexion. */
+    private void flashStatus(String label) {
+        if (status == null || label == null || label.length() == 0) return;
+        status.setText("▶ " + label);
+        status.setTextColor(ACCENT);
+        ui.removeCallbacks(restoreStatus);
+        ui.postDelayed(restoreStatus, 1800);
+    }
+
+    /** Fond Material avec effet d'ondulation (ripple) a l'appui. */
+    private android.graphics.drawable.Drawable ripple(int color) {
+        android.content.res.ColorStateList rc = android.content.res.ColorStateList.valueOf(0x40FFFFFF);
+        return new android.graphics.drawable.RippleDrawable(rc, pill(color), null);
     }
 
     /** Etat a partir des trames MCU -> SoC. */
@@ -258,6 +286,7 @@ public final class MainActivity extends Activity implements Backend.Listener {
 
         LinearLayout top = hrow();
         top.setBackgroundDrawable(round(CARD, 14));
+        top.setElevation(dp(3));
         top.setPadding(dp(14), dp(8), dp(14), dp(8));
         LinearLayout brand = vcol();
         TextView title = text("MCU Toolkit", 22, TXT);
@@ -372,6 +401,7 @@ public final class MainActivity extends Activity implements Backend.Listener {
             public void onClick(View v) {
                 mode[0] = mode[0] % 3 + 1;
                 mb.setText(I18n.t("mode : ") + I18n.t(new String[]{"", "auto", "manuel", "semi-auto"}[mode[0]]));
+                flashStatus(mb.getText().toString());
             }
         });
         led.addView(mb);
@@ -559,7 +589,7 @@ public final class MainActivity extends Activity implements Backend.Listener {
 
     private Button simBtn(String s, final int cmd, final int... data) {
         Button b = button(s, new View.OnClickListener() { public void onClick(View v) { simulate(cmd, data); } });
-        b.setBackgroundDrawable(pill(0xFF2A2436));
+        b.setBackgroundDrawable(ripple(0xFF2A2436));
         return b;
     }
 
@@ -720,10 +750,13 @@ public final class MainActivity extends Activity implements Backend.Listener {
         b.setAllCaps(false);
         b.setTextColor(TXT);
         b.setTextSize(15);
-        b.setBackgroundDrawable(pill(CARD));
-        b.setPadding(dp(16), dp(6), dp(16), dp(6));
-        b.setMinHeight(dp(44));
-        if (c != null) b.setOnClickListener(c);
+        b.setBackgroundDrawable(ripple(CARD));
+        b.setPadding(dp(16), dp(8), dp(16), dp(8));
+        b.setMinHeight(dp(48));
+        final String lbl = I18n.t(s);
+        if (c != null) b.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { flashStatus(lbl); c.onClick(v); }
+        });
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
         lp.setMargins(dp(4), dp(2), dp(4), dp(2));
         b.setLayoutParams(lp);
@@ -740,6 +773,7 @@ public final class MainActivity extends Activity implements Backend.Listener {
         c.setText(I18n.t(s));
         c.setTextColor(TXT);
         c.setChecked(on);
+        c.setMinHeight(dp(48));
         return c;
     }
 
