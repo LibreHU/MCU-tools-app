@@ -55,6 +55,8 @@ sert de clé, une table par langue le traduit (clé absente → repli sur le fra
 dupliquer la table `EN` et l'aiguiller dans `setLang()`.
 
 ## Reverse engineering du MCU
+- [`docs/ivi_audio.md`](docs/ivi_audio.md) : chaîne audio (puce DSP I2C, AIDL `IAudio` et ses paramètres),
+  caméra de recul, Bluetooth.
 - [`docs/mcu_firmware.md`](docs/mcu_firmware.md) : référence complète du MCU (brochage, alimentation, protocole,
   interfaçage Android, mise à jour, voies de secours).
 - [`tools/mcu/`](tools/mcu) : désassemblage/analyse du firmware (`mdis.py`, `ana.py`, `ana2.py`), `jacmcu.py`

@@ -1,0 +1,118 @@
+# Audio, caméra de recul et Bluetooth (ivi-services / ivi-audio-settings)
+
+Analyse statique (jadx) de `ivi-services.apk` (`com.jancar.services`), `ivi-audio-settings.apk`
+(`com.jancar.audiosettings`), `ivi-btservice.apk` et `ivi-bt.apk`, croisée avec un dump de l'UJC201
+(`ro.build.display.id=UJC201-V1.1.35R6-250718_0429`, `ro.board.platform=ac8257`).
+Les APK ne sont pas dans le dépôt (fichiers constructeur). Niveaux : **[A]** lu dans l'APK, **[V]** vu
+dans le dump, **[D]** déduit.
+
+## 1. En bref
+
+- **Le traitement audio n'est pas fait par Android** : l'EQ, la balance et le fader, les délais par
+  haut-parleur, le subwoofer et le loudness sont réglés dans une **puce audio externe sur l'I2C 6**,
+  pilotée par ivi-services via `libJanCarIVI.so` [A].
+- L'app d'égaliseur (`com.jancar.audiosettings`) n'est qu'une interface : tout passe par l'AIDL
+  **`com.jancar.services.audio.IAudio`**, en particulier **`setParam(id, valeur)`** [A].
+- Le service audio est **exporté sans permission** (`AudioService`, action `com.jancar.services.action.audio`),
+  comme `CarService` : **une app tierce peut s'y lier et régler la puce** [A].
+- La MCU n'intervient pas dans l'audio, à part le mute (`08`) et le REM de l'ampli (`44`) (voir `mcu_firmware.md`).
+
+## 2. Quelle puce sur cette carte ?
+
+ivi-services choisit le pilote d'après le **board id** lu dans
+`/sys/devices/virtual/mtk-adc-cali/mtk-adc-cali/jancar_board_id` (la clé `BoardId=` de `[Platform]`
+dans `ivi-config.ini` est vide sur ce dump [V]). Le **4e caractère** donne la puce [A] :
+
+| 4e caractère | Puce | `ChipId` | Capacités exposées par ivi-services |
+|---|---|---|---|
+| `A` | **ROHM BD37534** (processeur analogique) | 2 | EQ 3 bandes matériel (présenté sur 6 curseurs), balance/fader, sub (gain), loudness |
+| `B` | **ROHM BU32107** (DSP) — valeur **par défaut** si inconnu | 7 | EQ **16 bandes**, **délais par HP** (FL/FR/RL/RR, 0..20), P2Bass AV/AR, filtres IIR AV/AR, sub LPF/HPF |
+| `C` | **AKM AK7604** (DSP) | 8 | EQ **13 bandes**, délais par HP, mêmes réglages avancés que le BU32107 |
+
+Le SDK connaît aussi AK7601, TEF6638, TM2313, YMU836 et ES7243L (autres cartes). Pour lire la valeur sur l'appareil :
+```sh
+adb shell cat /sys/devices/virtual/mtk-adc-cali/mtk-adc-cali/jancar_board_id
+adb logcat -d | grep -E "boardId|audioDeviceID"      # ivi-services journalise la valeur au démarrage
+```
+Dans `last_kmsg` [V], seul l'ampli « smart PA » MTK (`speaker_amp 3-0034`) apparaît, et son probe échoue (-121) :
+il n'est pas utilisé. La puce audio, elle, est gérée en espace utilisateur (ivi-services).
+
+## 3. AIDL `IAudio` (descripteur `com.jancar.services.audio.IAudio`)
+
+Liaison : `new Intent("com.jancar.services.action.audio").setPackage("com.jancar.services")`.
+
+| Transaction | Méthode | Notes |
+|---|---|---|
+| 2 / 3 | `registerCallback` / `unRegisterCallback(IAudioCallback)` | volume, mute, barre de volume, canal maître |
+| 4..7 | `isParamAvailable` / `getParamMin/Max/DefaultValue(int id)` | à interroger pour savoir ce que la puce supporte |
+| 8 | `int getParam(int id)` | |
+| **9** | **`setParam(int id, int value)`** | **réglage principal** (voir les identifiants plus bas) |
+| 10 | `int[] getEqGains(int eqMode)` | préréglages |
+| 11..24 | pré-volumes par source (`BuildInPreVolume`, principal et secondaire) | en dB, par canal audio |
+| 25..38 | gain de volume maître / secondaire | courbe de volume |
+| 48 | `requestInternalShortMute(int ms)` | |
+| 50 | `int getMasterAudioChannel()` | source active |
+| 51 | `setChipParam(int chipId, int paramId, double v0..v3)` | accès bas niveau à la puce |
+| 52..54 | effets « expert » (fichiers de coefficients) | |
+
+Appel brut, sans les classes AIDL (même principe que pour `ICar`) :
+```java
+static void setAudioParam(IBinder b, int id, int value) throws RemoteException {   // transaction 9
+    Parcel in = Parcel.obtain(), out = Parcel.obtain();
+    try { in.writeInterfaceToken("com.jancar.services.audio.IAudio"); in.writeInt(id); in.writeInt(value);
+          b.transact(9, in, out, 0); out.readException(); }
+    finally { in.recycle(); out.recycle(); }
+}
+```
+
+### Identifiants de `setParam` (`AudioParam.Id`) [A]
+| Id | Nom | Plage typique (BU32107 / AK7604) |
+|---|---|---|
+| 1 / 2 | MUTE / MUTE_SECONDARY | 0/1 |
+| 10..19, 65 | volumes (maître, média, BT, sonnerie, alarme, CCD, navi, TTS, secondaire, radio, téléphone) | 0..40 |
+| 21 / 22 / 23 | BASS / MIDDLE / TREBLE | 0..20 |
+| **24** | **BALANCE_FADE** | balance et fader **0..60** chacun (30 = centre), encodés `((balance+100) << 16) \| (fade+100)` |
+| 25 | POSITION (zone d'écoute préréglée) | 0..4 |
+| 27 | LOUDNESS | 0..10 |
+| 31 | EQ_COUNT (lecture seule) | 6 / 16 / 13 selon la puce |
+| 32 | EQ_MODE (préréglage) | 1..15 |
+| **33..36** | **LF / LR / RL / RR_SPEAK_DELAY** (alignement temporel par haut-parleur) | 0..20 |
+| 37..40 | FRONT/REAR_P2BASS_DB et _FC | 0..12 / 0..7 |
+| 41 / 42 / 43 | CENTER / SUBWOOFER (gain) / SURROUND | sub 0..12 |
+| 51 | ASL (volume asservi à la vitesse) | 0..3 |
+| 52 | SUBWOOFER_SPEAKER_SWITCH | 0/1 |
+| 101..108 | CAR_AMP_* (volume, graves, médiums, aigus, ASL, source, mute d'un **ampli d'origine**, via le CAN) | |
+| 109..113 | réglages de Q de l'EQ | |
+| 114 / 115 | gains micro (voix, appel BT) | |
+| 116 / 117 / 118 | IIR_STRENGTH / IIR_FILTER_FRONT / IIR_FILTER_REAR | -20..20 / 0..230 |
+| 119 / 120 | SUB_FILTER_LPF / SUB_FILTER_HPF | 0..11 |
+| 1000+n / 1020+n / 1040+n | EQ bande n : gain / Q / fréquence centrale | gain 0..20 (10 = 0 dB) |
+
+Constantes des haut-parleurs (`IVIAudio.Speaker`) : FL=0, FR=1, RL=2, RR=3, SWL=4, SWR=5.
+
+## 4. Conséquences pour un égaliseur tiers (fork ViPER4Android)
+
+- **ViPER agit sur le flux Android** (effet AudioFlinger, en général stéréo), **en amont** de la puce. Il ne
+  peut donc pas traiter séparément l'avant et l'arrière : cette séparation n'existe que dans la puce [D].
+- **EQ par haut-parleur, fader, balance, délais, sub** : à piloter **via `IAudio.setParam`**. C'est possible
+  sans root, puisque le service est exporté sans permission.
+- Combinaison naturelle : ViPER pour le « son » (convolver, bass, clarity, etc.), et un onglet « Véhicule »
+  dans le fork qui règle la puce (fader/balance, délais FL/FR/RL/RR, EQ matériel, sub LPF/HPF, ampli).
+  Ce que la puce supporte se lit avec `isParamAvailable` et les min/max (transactions 4..7).
+- Sur une ROM **LineageOS sans ivi-services**, il faudrait réimplémenter le pilote I2C de la puce (registres
+  du BD37534 publics dans la datasheet ROHM ; BU32107/AK7604 beaucoup moins documentés).
+
+## 5. Caméra de recul [A]
+
+- La marche arrière (« CCD ») est lue **sur un GPIO du SoC** (`getCcdStatus()`), **pas via la MCU**.
+  Elle peut aussi venir du CAN (broadcast `action_backcar_notification`, extra `backcar`).
+- Mode « fast reverse » Autochips géré tôt au démarrage (propriété système), puis l'app
+  **`com.autochips.backcarapp`** prend le relais.
+- Broadcasts système : `android.backcar.action.PREPARE_START`, `.STARTED`, `.FINISH`.
+- Le dump contient la configuration caméra et AVM : `vendor/etc/atc_camera_config.xml`,
+  `atc_camera_source_config.xml`, `/avm/*.xml` [V].
+
+## 6. Bluetooth [A]
+
+`com.jancar.btservice` et `com.jancar.bluetooth` (uid système) utilisent la **pile Bluetooth Android
+standard** (profils voiture `HeadsetClient`, `A2dpSink`, `PbapClient`), pas de module série dédié.
