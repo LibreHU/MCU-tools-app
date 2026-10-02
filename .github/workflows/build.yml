@@ -22,11 +22,14 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: SDK Android
+      - name: SDK Android (cmdline-tools, sans le paquet obsolete "tools")
         uses: android-actions/setup-android@v3
+        with:
+          packages: ''
 
       - name: Composants SDK + clang/lld
         run: |
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
           sdkmanager "platforms;android-28" "build-tools;34.0.0"
           sudo apt-get update
           sudo apt-get install -y clang lld
