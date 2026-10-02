@@ -640,6 +640,32 @@ public final class MainActivity extends Activity implements Backend.Listener {
         return scroll(p);
     }
 
+    /** Noeud lu par ivi-services pour choisir le pilote audio (docs/ivi_audio.md, section 2). */
+    static final String BOARD_ID_NODE = "/sys/devices/virtual/mtk-adc-cali/mtk-adc-cali/jancar_board_id";
+
+    private static String readLine(String path) {
+        java.io.BufferedReader r = null;
+        try {
+            r = new java.io.BufferedReader(new java.io.FileReader(path));
+            return r.readLine();
+        } catch (Exception e) {
+            return null;
+        } finally {
+            if (r != null) try { r.close(); } catch (Exception e) { }
+        }
+    }
+
+    /** Meme regle qu'ivi-services : 4e caractere A/B/C, sinon A1 -> AK7604, autre -> BU32107 (defaut). */
+    static String audioChip(String bid) {
+        if (bid == null || bid.length() < 4) return "? (board id inconnu)";
+        switch (bid.charAt(3)) {
+            case 'A': return "ROHM BD37534 (EQ 3 bandes)";
+            case 'B': return "ROHM BU32107 (EQ 16 bandes, delais HP)";
+            case 'C': return "AKM AK7604 (EQ 13 bandes, delais HP)";
+            default: return bid.startsWith("A1") ? "AKM AK7604 (EQ 13 bandes, delais HP)" : "ROHM BU32107 (defaut)";
+        }
+    }
+
     private void refreshInfoLater() { ui.postDelayed(new Runnable() { public void run() { refreshInfo(); } }, 1500); }
 
     private void refreshInfo() {
@@ -653,6 +679,11 @@ public final class MainActivity extends Activity implements Backend.Listener {
                     android.content.pm.PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
                     sb.append("Version app    : ").append(pi.versionName).append(" (code ").append(pi.versionCode).append(")\n");
                 } catch (Exception e) { }
+                String bid = readLine(BOARD_ID_NODE);
+                if (bid == null && root) bid = RootBackend.su("cat " + BOARD_ID_NODE);
+                if (bid != null) bid = bid.trim();
+                sb.append("Board id       : ").append(bid == null || bid.isEmpty() ? "illisible" : bid).append('\n');
+                sb.append("Puce audio     : ").append(audioChip(bid)).append('\n');
                 sb.append("Android        : ").append(Build.VERSION.RELEASE).append(" (SDK ").append(Build.VERSION.SDK_INT).append(")\n");
                 sb.append("Modele         : ").append(Build.MANUFACTURER).append(' ').append(Build.MODEL).append('\n');
                 sb.append("READ_LOGS      : ").append(checkCallingOrSelfPermission("android.permission.READ_LOGS")
