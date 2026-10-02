@@ -38,6 +38,22 @@ confirmation.
 Sortie : `out/JacMCU.apk` (arm64, Android 6+, cible API 28). La clé de signature
 `jacmcu.keystore` est créée au premier build et n'est pas versionnée : garder la même pour les mises à jour.
 
+## Versions
+La version est dérivée de git, pas codée en dur :
+- **`versionName`** = `git describe --tags` (ex. `v1.0.0`, ou `v1.0.0-3-gabc123` entre deux tags) ;
+- **`versionCode`** = nombre de commits (`git rev-list --count HEAD`), donc toujours croissant.
+
+Surchargeable via `VERSION_NAME` / `VERSION_CODE`. La version s'affiche dans l'onglet **Infos** de l'app.
+Pour publier une version : créer un tag `vX.Y.Z` et le pousser — GitHub Actions compile et joint l'APK à une
+**Release** (`git tag v1.1.0 && git push origin v1.1.0`). Chaque build CI nomme aussi son artefact
+`MCU-Toolkit-<version>`.
+
+## Langues
+Interface **français / anglais**, sélecteur dans l'en-tête (bouton `AUTO` / `FR` / `EN`). `AUTO` suit la langue
+du système. Traductions dans [`src/com/dokt/jacmcu/I18n.java`](src/com/dokt/jacmcu/I18n.java) : le texte français
+sert de clé, une table par langue le traduit (clé absente → repli sur le français). Pour ajouter une langue,
+dupliquer la table `EN` et l'aiguiller dans `setLang()`.
+
 ## Reverse engineering du MCU
 - [`docs/mcu_firmware.md`](docs/mcu_firmware.md) : référence complète du MCU (brochage, alimentation, protocole,
   interfaçage Android, mise à jour, voies de secours).

@@ -67,6 +67,7 @@ public final class MainActivity extends Activity implements Backend.Listener {
         super.onCreate(b);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         prefs = getSharedPreferences("jacmcu", MODE_PRIVATE);
+        I18n.setLang(prefs.getString("lang", "auto"));
         setContentView(buildUi());
         selectTab(prefs.getInt("tab", 0));
         startBackend(prefs.getString("mode", "service"));
@@ -88,7 +89,7 @@ public final class MainActivity extends Activity implements Backend.Listener {
         modeService.setBackgroundDrawable(pill(root ? CARD : ACCENT));
         modeRoot.setBackgroundDrawable(pill(root ? ACCENT : CARD));
         direct.setEnabled(root);
-        onStatus("demarrage " + backend.name() + "...", false);
+        onStatus(I18n.t("demarrage ") + backend.name() + "...", false);
         addLog("== mode " + backend.name());
         backend.start(this);
         refreshInfo();
@@ -154,7 +155,7 @@ public final class MainActivity extends Activity implements Backend.Listener {
     private void setState(String k, String v) {
         state.put(k, v);
         TextView t = tiles.get(k);
-        if (t != null) { t.setText(v); t.setTextColor(tileColor(k, v)); }
+        if (t != null) { t.setText(I18n.t(v)); t.setTextColor(tileColor(k, v)); }
     }
 
     /** Couleur d'une valeur d'etat : vert = actif/present, rouge = coupe/perdu, ambre = attention. */
@@ -178,18 +179,18 @@ public final class MainActivity extends Activity implements Backend.Listener {
 
     private void sendBytes(final int cmd, final byte[] data) {
         if (Frame.forbidden(cmd)) {
-            toast(String.format("%02X (bootloader) bloque dans l'app : risque de MCU inutilisable", cmd));
+            toast(String.format(I18n.t("%02X (bootloader) bloque dans l'app : risque de MCU inutilisable"), cmd));
             return;
         }
-        if (data.length > Frame.MAX_DATA) { toast("trop de donnees (max " + Frame.MAX_DATA + ")"); return; }
+        if (data.length > Frame.MAX_DATA) { toast(I18n.t("trop de donnees (max ") + Frame.MAX_DATA + ")"); return; }
         String danger = Frame.danger(cmd);
         if (danger == null) { doSend(cmd, data); return; }
         new AlertDialog.Builder(this)
-                .setTitle(String.format("Commande %02X : %s", cmd, danger))
-                .setMessage("Cette commande peut eteindre ou redemarrer l'autoradio (eventuellement en roulant). Envoyer quand meme ?\n\n"
+                .setTitle(String.format(I18n.t("Commande %02X : %s"), cmd, I18n.t(danger)))
+                .setMessage(I18n.t("Cette commande peut eteindre ou redemarrer l'autoradio (eventuellement en roulant). Envoyer quand meme ?\n\n")
                         + Frame.hex(Frame.build(cmd, data)))
-                .setNegativeButton("Annuler", null)
-                .setPositiveButton("Envoyer", new DialogInterface.OnClickListener() {
+                .setNegativeButton(I18n.t("Annuler"), null)
+                .setPositiveButton(I18n.t("Envoyer"), new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d, int w) { doSend(cmd, data); }
                 }).show();
     }
@@ -241,10 +242,10 @@ public final class MainActivity extends Activity implements Backend.Listener {
             FileOutputStream o = new FileOutputStream(f);
             for (String s : log) o.write((s + "\n").getBytes("UTF-8"));
             o.close();
-            toast("journal : " + f.getAbsolutePath());
+            toast(I18n.t("journal : ") + f.getAbsolutePath());
             addLog("# exporte : " + f.getAbsolutePath());
         } catch (Exception e) {
-            toast("export impossible : " + e.getMessage());
+            toast(I18n.t("export impossible : ") + e.getMessage());
         }
     }
 
@@ -276,6 +277,8 @@ public final class MainActivity extends Activity implements Backend.Listener {
             }
         });
         top.addView(direct);
+        Button langBtn = button(langLabel(), new View.OnClickListener() { public void onClick(View v) { cycleLang(); } });
+        top.addView(langBtn);
         status = text("", 14, WARN);
         status.setPadding(dp(16), 0, 0, 0);
         top.addView(status, new LinearLayout.LayoutParams(0, -2, 1));
@@ -368,7 +371,7 @@ public final class MainActivity extends Activity implements Backend.Listener {
         mb.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 mode[0] = mode[0] % 3 + 1;
-                mb.setText("mode : " + new String[]{"", "auto", "manuel", "semi-auto"}[mode[0]]);
+                mb.setText(I18n.t("mode : ") + I18n.t(new String[]{"", "auto", "manuel", "semi-auto"}[mode[0]]));
             }
         });
         led.addView(mb);
@@ -411,7 +414,7 @@ public final class MainActivity extends Activity implements Backend.Listener {
         LinearLayout p = vcol();
         LinearLayout r = hrow();
         final EditText in = new EditText(this);
-        in.setHint("CMD donnees... ex : F0 0A 00");
+        in.setHint(I18n.t("CMD donnees... ex : F0 0A 00"));
         in.setTextColor(TXT); in.setHintTextColor(DIM);
         in.setTypeface(Typeface.MONOSPACE);
         in.setSingleLine(true);
@@ -474,11 +477,11 @@ public final class MainActivity extends Activity implements Backend.Listener {
         if (!(backend instanceof ServiceBackend)) { toast("mode service uniquement"); return; }
         final ServiceBackend s = (ServiceBackend) backend;
         if (s.isCanCapture()) { new Thread(new Runnable() { public void run() { s.setCanCapture(false); } }).start(); return; }
-        new AlertDialog.Builder(this).setTitle("Capturer les trames CAN (0x10) ?")
-                .setMessage("ivi-services n'accepte qu'un client : com.jancar.canservice (appli canbus) ne recevra plus rien "
-                        + "jusqu'au prochain redemarrage d'ivi-services / de l'autoradio.")
-                .setNegativeButton("Annuler", null)
-                .setPositiveButton("Capturer", new DialogInterface.OnClickListener() {
+        new AlertDialog.Builder(this).setTitle(I18n.t("Capturer les trames CAN (0x10) ?"))
+                .setMessage(I18n.t("ivi-services n'accepte qu'un client : com.jancar.canservice (appli canbus) ne recevra plus rien "
+                        + "jusqu'au prochain redemarrage d'ivi-services / de l'autoradio."))
+                .setNegativeButton(I18n.t("Annuler"), null)
+                .setPositiveButton(I18n.t("Capturer"), new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d, int w) {
                         new Thread(new Runnable() { public void run() { s.setCanCapture(true); } }).start();
                     }
@@ -487,11 +490,11 @@ public final class MainActivity extends Activity implements Backend.Listener {
 
     private void updatePreview(String s) {
         byte[] b = Frame.parseHex(s);
-        if (b == null || b.length == 0) { preview.setText("trame : --"); return; }
-        if (b.length - 1 > Frame.MAX_DATA) { preview.setText("trop long"); return; }
+        if (b == null || b.length == 0) { preview.setText(I18n.t("trame : --")); return; }
+        if (b.length - 1 > Frame.MAX_DATA) { preview.setText(I18n.t("trop long")); return; }
         byte[] f = Frame.build(b[0] & 0xFF, Frame.slice(b, 1, b.length));
-        String w = Frame.forbidden(b[0] & 0xFF) ? "   BLOQUE" : Frame.danger(b[0] & 0xFF) != null ? "   confirmation demandee" : "";
-        preview.setText("trame : " + Frame.hex(f) + "   " + Frame.describe(f, false) + w);
+        String w = Frame.forbidden(b[0] & 0xFF) ? I18n.t("   BLOQUE") : Frame.danger(b[0] & 0xFF) != null ? I18n.t("   confirmation demandee") : "";
+        preview.setText(I18n.t("trame : ") + Frame.hex(f) + "   " + Frame.describe(f, false) + w);
     }
 
     // ================================================================== simulation (local)
@@ -535,7 +538,7 @@ public final class MainActivity extends Activity implements Backend.Listener {
         p.addView(section("Trame libre"));
         LinearLayout r = hrow();
         final EditText in = new EditText(this);
-        in.setHint("CMD donnees... ex : 0B 01");
+        in.setHint(I18n.t("CMD donnees... ex : 0B 01"));
         in.setTextColor(TXT); in.setHintTextColor(DIM);
         in.setTypeface(Typeface.MONOSPACE);
         in.setSingleLine(true);
@@ -616,6 +619,10 @@ public final class MainActivity extends Activity implements Backend.Listener {
             public void run() {
                 final StringBuilder sb = new StringBuilder();
                 sb.append("Mode           : ").append(backend == null ? "-" : backend.name()).append('\n');
+                try {
+                    android.content.pm.PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
+                    sb.append("Version app    : ").append(pi.versionName).append(" (code ").append(pi.versionCode).append(")\n");
+                } catch (Exception e) { }
                 sb.append("Android        : ").append(Build.VERSION.RELEASE).append(" (SDK ").append(Build.VERSION.SDK_INT).append(")\n");
                 sb.append("Modele         : ").append(Build.MANUFACTURER).append(' ').append(Build.MODEL).append('\n');
                 sb.append("READ_LOGS      : ").append(checkCallingOrSelfPermission("android.permission.READ_LOGS")
@@ -661,7 +668,7 @@ public final class MainActivity extends Activity implements Backend.Listener {
 
     private TextView text(String s, int sp, int color) {
         TextView t = new TextView(this);
-        t.setText(s);
+        t.setText(I18n.t(s));
         t.setTextSize(sp);
         t.setTextColor(color);
         return t;
@@ -709,7 +716,7 @@ public final class MainActivity extends Activity implements Backend.Listener {
 
     private Button button(String s, View.OnClickListener c) {
         Button b = new Button(this);
-        b.setText(s);
+        b.setText(I18n.t(s));
         b.setAllCaps(false);
         b.setTextColor(TXT);
         b.setTextSize(15);
@@ -730,7 +737,7 @@ public final class MainActivity extends Activity implements Backend.Listener {
 
     private CheckBox check(String s, boolean on) {
         CheckBox c = new CheckBox(this);
-        c.setText(s);
+        c.setText(I18n.t(s));
         c.setTextColor(TXT);
         c.setChecked(on);
         return c;
@@ -768,5 +775,18 @@ public final class MainActivity extends Activity implements Backend.Listener {
         return r;
     }
 
-    private void toast(String s) { Toast.makeText(this, s, Toast.LENGTH_LONG).show(); }
+    private String langLabel() {
+        String c = prefs.getString("lang", "auto");
+        return "auto".equals(c) ? "AUTO" : c.toUpperCase(Locale.ROOT);
+    }
+
+    private void cycleLang() {
+        String cur = prefs.getString("lang", "auto");
+        int i = 0;
+        for (int j = 0; j < I18n.LANGS.length; j++) if (I18n.LANGS[j].equals(cur)) i = j;
+        prefs.edit().putString("lang", I18n.LANGS[(i + 1) % I18n.LANGS.length]).apply();
+        recreate();
+    }
+
+    private void toast(String s) { Toast.makeText(this, I18n.t(s), Toast.LENGTH_LONG).show(); }
 }

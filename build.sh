@@ -5,8 +5,11 @@
 # Signature : KEYSTORE (defaut ./jacmcu.keystore, cree au besoin, non versionne), mot de passe KS_PASS (defaut android).
 set -e
 cd "$(dirname "$0")"
-VERSION_CODE=${VERSION_CODE:-1}
-VERSION_NAME=${VERSION_NAME:-1.0}
+# Versionnement derive de git : code = nombre de commits (monotone), nom = dernier tag + distance.
+# Surchargeable par les variables d'environnement VERSION_CODE / VERSION_NAME.
+VERSION_CODE=${VERSION_CODE:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}
+VERSION_NAME=${VERSION_NAME:-$(git describe --tags --always --dirty 2>/dev/null || echo 0.0.0)}
+echo "Version : $VERSION_NAME (code $VERSION_CODE)"
 
 if [ -n "$ANDROID_HOME" ]; then
 	BT=$(ls -d "$ANDROID_HOME"/build-tools/* 2>/dev/null | sort -V | tail -n1)

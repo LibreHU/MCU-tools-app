@@ -3,6 +3,7 @@ name: Build APK
 on:
   push:
     branches: [main, "**-LOS"]
+    tags: ["v*"]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -13,8 +14,12 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # necessaire pour publier une Release sur les tags
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # historique + tags complets pour le versionnement (git describe)
 
       - name: JDK 17
         uses: actions/setup-java@v4
@@ -34,16 +39,28 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang lld
 
+      - name: Version (git)
+        id: ver
+        run: echo "name=$(git describe --tags --always --dirty)" >> "$GITHUB_OUTPUT"
+
       - name: Build (build.sh)
         env:
-          VERSION_CODE: ${{ github.run_number }}
-          VERSION_NAME: ${{ github.ref_name }}-${{ github.run_number }}
           KS_PASS: android
         run: ./build.sh
+
+      - name: Renomme l'APK avec la version
+        run: cp out/JacMCU.apk "out/MCU-Toolkit-${{ steps.ver.outputs.name }}.apk"
 
       - name: Artefact APK
         uses: actions/upload-artifact@v4
         with:
-          name: JacMCU-${{ github.ref_name }}
-          path: out/JacMCU.apk
+          name: MCU-Toolkit-${{ steps.ver.outputs.name }}
+          path: out/MCU-Toolkit-${{ steps.ver.outputs.name }}.apk
           if-no-files-found: error
+
+      - name: Release GitHub (sur tag v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/MCU-Toolkit-${{ steps.ver.outputs.name }}.apk
+          generate_release_notes: true
