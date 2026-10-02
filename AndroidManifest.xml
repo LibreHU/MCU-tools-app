@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.READ_LOGS" />
 
     <application
-        android:label="JacMCU"
+        android:label="MCU Toolkit"
         android:icon="@drawable/ic_launcher"
         android:theme="@android:style/Theme.Material.NoActionBar"
         android:allowBackup="false"

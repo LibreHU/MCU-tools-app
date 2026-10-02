@@ -259,7 +259,7 @@ public final class MainActivity extends Activity implements Backend.Listener {
         top.setBackgroundDrawable(round(CARD, 14));
         top.setPadding(dp(14), dp(8), dp(14), dp(8));
         LinearLayout brand = vcol();
-        TextView title = text("JacMCU", 22, TXT);
+        TextView title = text("MCU Toolkit", 22, TXT);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         brand.addView(title);
         brand.addView(text("MCU Jancar / AC8257", 11, DIM));
