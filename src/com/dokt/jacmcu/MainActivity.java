@@ -41,9 +41,9 @@ import java.util.Locale;
 import java.util.Map;
 
 public final class MainActivity extends Activity implements Backend.Listener {
-    static final int BG = 0xFF0E1216, CARD = 0xFF1A2027, CARD_HI = 0xFF232C36, ACCENT = 0xFF4DA3FF,
-            OK = 0xFF46D39A, BAD = 0xFFF2645A, WARN = 0xFFF0A92B, TXT = 0xFFEAF0F6, DIM = 0xFF8A98A6,
-            SIM = 0xFFB98AF0;
+    static final int BG = 0xFF101114, CARD = 0xFF1B1D21, CARD_HI = 0xFF282B30, ACCENT = 0xFFA8C7FA,
+            OK = 0xFFB7F0D0, BAD = 0xFFFFB4AB, WARN = 0xFFFFD8A8, TXT = 0xFFF4F5F7, DIM = 0xFF9AA0A8,
+            SIM = 0xFFD7BAFF;
 
     private final Handler ui = new Handler(Looper.getMainLooper());
     private SharedPreferences prefs;
@@ -135,16 +135,18 @@ public final class MainActivity extends Activity implements Backend.Listener {
     private final Runnable restoreStatus = new Runnable() {
         public void run() {
             if (status == null) return;
-            status.setText((lastStatusOk ? "● " : "○ ") + lastStatusText);
+            status.setText((lastStatusOk ? "●  " : "○  ") + lastStatusText);
             status.setTextColor(lastStatusOk ? OK : WARN);
+            status.setBackgroundDrawable(pill(lastStatusOk ? 0xFF21372F : 0xFF3A3124));
         }
     };
 
     /** Message de statut bref (retour tactile a l'appui d'un bouton), puis retour au statut de connexion. */
     private void flashStatus(String label) {
         if (status == null || label == null || label.length() == 0) return;
-        status.setText("▶ " + label);
+        status.setText("▶  " + label);
         status.setTextColor(ACCENT);
+        status.setBackgroundDrawable(pill(0xFF23313F));
         ui.removeCallbacks(restoreStatus);
         ui.postDelayed(restoreStatus, 1800);
     }
@@ -282,21 +284,26 @@ public final class MainActivity extends Activity implements Backend.Listener {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(BG);
-        root.setPadding(dp(12), dp(8), dp(12), dp(8));
+        root.setPadding(dp(14), dp(10), dp(14), dp(10));
 
+        // Android Auto-inspired app bar.
         LinearLayout top = hrow();
-        top.setBackgroundDrawable(round(CARD, 14));
-        top.setElevation(dp(3));
-        top.setPadding(dp(14), dp(8), dp(14), dp(8));
+        top.setBackgroundDrawable(round(CARD, 24));
+        top.setElevation(dp(2));
+        top.setPadding(dp(18), dp(10), dp(14), dp(10));
+
         LinearLayout brand = vcol();
-        TextView title = text("MCU Toolkit", 22, TXT);
+        TextView title = text("MCU Toolkit", 21, TXT);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         brand.addView(title);
-        brand.addView(text("MCU Jancar / AC8257", 11, DIM));
-        top.addView(brand, new LinearLayout.LayoutParams(-2, -2));
+        brand.addView(text("MCU Jancar / AC8257", 12, DIM));
+        top.addView(brand, new LinearLayout.LayoutParams(0, -2, 1));
+
         modeService = button("Service Jancar", new View.OnClickListener() { public void onClick(View v) { startBackend("service"); } });
         modeRoot = button("Root", new View.OnClickListener() { public void onClick(View v) { startBackend("root"); } });
-        top.addView(space(16)); top.addView(modeService); top.addView(modeRoot);
+        top.addView(modeService);
+        top.addView(modeRoot);
+
         direct = check("lecture directe du port", prefs.getBoolean("direct", false));
         direct.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             public void onCheckedChanged(CompoundButton b, boolean on) {
@@ -306,36 +313,49 @@ public final class MainActivity extends Activity implements Backend.Listener {
             }
         });
         top.addView(direct);
+
         Button langBtn = button(langLabel(), new View.OnClickListener() { public void onClick(View v) { cycleLang(); } });
         top.addView(langBtn);
-        status = text("", 14, WARN);
-        status.setPadding(dp(16), 0, 0, 0);
-        top.addView(status, new LinearLayout.LayoutParams(0, -2, 1));
+
+        status = text("", 13, WARN);
+        status.setGravity(Gravity.CENTER);
+        status.setBackgroundDrawable(pill(CARD_HI));
+        status.setPadding(dp(14), 0, dp(14), 0);
+        top.addView(status, new LinearLayout.LayoutParams(dp(180), dp(48)));
         root.addView(top);
 
+        FrameLayout content = new FrameLayout(this);
+        pages[0] = pageState();
+        pages[1] = pageCommands();
+        pages[2] = pageConsole();
+        pages[3] = pageSimu();
+        pages[4] = pageInfo();
+        for (View p : pages) content.addView(p, new FrameLayout.LayoutParams(-1, -1));
+        root.addView(content, new LinearLayout.LayoutParams(-1, 0, 1));
+
+        // Android Auto-style bottom navigation.
         LinearLayout tabRow = hrow();
+        tabRow.setBackgroundDrawable(round(CARD, 24));
+        tabRow.setPadding(dp(6), dp(6), dp(6), dp(6));
         String[] names = {"Etat", "Commandes", "Console", "Simulation", "Infos"};
         for (int i = 0; i < tabs.length; i++) {
             final int k = i;
             tabs[i] = button(names[i], new View.OnClickListener() { public void onClick(View v) { selectTab(k); } });
-            tabRow.addView(tabs[i], new LinearLayout.LayoutParams(0, -2, 1));
+            tabRow.addView(tabs[i], new LinearLayout.LayoutParams(0, dp(56), 1));
         }
         root.addView(tabRow);
 
-        FrameLayout content = new FrameLayout(this);
-        pages[0] = pageState(); pages[1] = pageCommands(); pages[2] = pageConsole(); pages[3] = pageSimu(); pages[4] = pageInfo();
-        for (View p : pages) content.addView(p, new FrameLayout.LayoutParams(-1, -1));
-        root.addView(content, new LinearLayout.LayoutParams(-1, 0, 1));
         return root;
     }
 
     private void selectTab(int k) {
+        if (k < 0 || k >= tabs.length) k = 0;
         prefs.edit().putInt("tab", k).apply();
         for (int i = 0; i < tabs.length; i++) {
             boolean sel = i == k;
             pages[i].setVisibility(sel ? View.VISIBLE : View.GONE);
-            tabs[i].setBackgroundDrawable(pill(sel ? ACCENT : CARD));
-            tabs[i].setTextColor(sel ? 0xFF0E1216 : TXT);
+            tabs[i].setBackgroundDrawable(ripple(sel ? ACCENT : CARD_HI));
+            tabs[i].setTextColor(sel ? 0xFF111318 : TXT);
             tabs[i].setTypeface(sel ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
         }
         if (k == tabs.length - 1) refreshInfo();
@@ -344,7 +364,7 @@ public final class MainActivity extends Activity implements Backend.Listener {
     private View pageState() {
         LinearLayout p = vcol();
         GridLayout g = new GridLayout(this);
-        g.setColumnCount(4);
+        g.setColumnCount(3);
         String[][] t = {{"version", "Version MCU"}, {"acc", "ACC"}, {"hb", "Frein a main"}, {"ill", "Feux (ILL)"},
                 {"mute", "Mute"}, {"bl", "Retroeclairage"}, {"radio", "Antenne radio"}, {"opt", "Option +0x11"},
                 {"date", "Date MCU"}, {"time", "Heure MCU"}, {"key", "Derniere touche"}, {"power", "Alim. (service)"},
@@ -725,37 +745,44 @@ public final class MainActivity extends Activity implements Backend.Listener {
         return g;
     }
 
-    private GradientDrawable pill(int color) { return round(color, 18); }
+    private GradientDrawable pill(int color) { return round(color, 22); }
 
     private TextView text(String s, int sp, int color) {
         TextView t = new TextView(this);
         t.setText(I18n.t(s));
         t.setTextSize(sp);
         t.setTextColor(color);
+        t.setGravity(Gravity.CENTER_VERTICAL);
         return t;
     }
 
     private TextView label(String s) {
-        TextView t = text(s, 15, DIM);
-        t.setMinWidth(dp(200));
+        TextView t = text(s, 14, DIM);
+        t.setMinWidth(dp(180));
         t.setGravity(Gravity.CENTER_VERTICAL);
         return t;
     }
 
     private TextView note(String s) {
         TextView t = text(s, 13, DIM);
-        t.setPadding(dp(4), dp(10), dp(4), dp(10));
+        t.setBackgroundDrawable(round(CARD, 18));
+        t.setPadding(dp(16), dp(12), dp(16), dp(12));
         return t;
     }
 
     private TextView section(String s) {
-        TextView t = text(s, 16, ACCENT);
+        TextView t = text(s, 15, TXT);
         t.setTypeface(Typeface.DEFAULT_BOLD);
-        t.setPadding(dp(4), dp(14), 0, dp(4));
+        t.setPadding(dp(6), dp(16), dp(6), dp(8));
+        t.setLetterSpacing(0.04f);
         return t;
     }
 
-    private View space(int w) { View v = new View(this); v.setLayoutParams(new LinearLayout.LayoutParams(dp(w), 1)); return v; }
+    private View space(int w) {
+        View v = new View(this);
+        v.setLayoutParams(new LinearLayout.LayoutParams(dp(w), 1));
+        return v;
+    }
 
     private LinearLayout hrow() {
         LinearLayout l = new LinearLayout(this);
@@ -771,25 +798,40 @@ public final class MainActivity extends Activity implements Backend.Listener {
         return l;
     }
 
-    private ScrollView scroll(View v) { ScrollView s = new ScrollView(this); s.addView(v); return s; }
+    private ScrollView scroll(View v) {
+        ScrollView sv = new ScrollView(this);
+        sv.setClipToPadding(false);
+        sv.setPadding(0, dp(4), 0, dp(4));
+        sv.addView(v);
+        return sv;
+    }
 
-    private HorizontalScrollView hscroll(View v) { HorizontalScrollView s = new HorizontalScrollView(this); s.addView(v); return s; }
+    private HorizontalScrollView hscroll(View v) {
+        HorizontalScrollView hs = new HorizontalScrollView(this);
+        hs.setClipToPadding(false);
+        hs.addView(v);
+        return hs;
+    }
 
     private Button button(String s, View.OnClickListener c) {
         Button b = new Button(this);
         b.setText(I18n.t(s));
         b.setAllCaps(false);
         b.setTextColor(TXT);
-        b.setTextSize(15);
-        b.setBackgroundDrawable(ripple(CARD));
-        b.setPadding(dp(16), dp(8), dp(16), dp(8));
-        b.setMinHeight(dp(48));
-        final String lbl = I18n.t(s);
-        if (c != null) b.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { flashStatus(lbl); c.onClick(v); }
-        });
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
-        lp.setMargins(dp(4), dp(2), dp(4), dp(2));
+        b.setTextSize(14);
+        b.setGravity(Gravity.CENTER);
+        b.setMinHeight(dp(52));
+        b.setMinWidth(dp(88));
+        b.setPadding(dp(16), dp(6), dp(16), dp(6));
+        b.setBackgroundDrawable(ripple(CARD_HI));
+        if (c != null) {
+            final String lbl = I18n.t(s);
+            b.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) { flashStatus(lbl); c.onClick(v); }
+            });
+        }
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, dp(52));
+        lp.setMargins(dp(3), dp(3), dp(3), dp(3));
         b.setLayoutParams(lp);
         return b;
     }
@@ -803,13 +845,21 @@ public final class MainActivity extends Activity implements Backend.Listener {
         CheckBox c = new CheckBox(this);
         c.setText(I18n.t(s));
         c.setTextColor(TXT);
+        c.setTextSize(13);
         c.setChecked(on);
-        c.setMinHeight(dp(48));
+        c.setMinHeight(dp(52));
+        c.setGravity(Gravity.CENTER_VERTICAL);
+        c.setPadding(dp(6), 0, dp(8), 0);
         return c;
     }
 
     private LinearLayout row(String name, View... vs) {
         LinearLayout r = hrow();
+        r.setBackgroundDrawable(round(CARD, 20));
+        r.setPadding(dp(10), dp(6), dp(10), dp(6));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.setMargins(0, dp(4), 0, dp(4));
+        r.setLayoutParams(lp);
         r.addView(label(name));
         for (View v : vs) r.addView(v);
         return r;
@@ -825,9 +875,15 @@ public final class MainActivity extends Activity implements Backend.Listener {
 
     private LinearLayout slider(String name, final int min, int max, int val, final int sub) {
         LinearLayout r = hrow();
+        r.setBackgroundDrawable(round(CARD, 20));
+        r.setPadding(dp(10), dp(4), dp(10), dp(4));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.setMargins(0, dp(4), 0, dp(4));
+        r.setLayoutParams(lp);
         r.addView(label(name));
         final SeekBar s = seek(min, max, val);
         final TextView v = text(String.valueOf(val), 15, TXT);
+        v.setTypeface(Typeface.DEFAULT_BOLD);
         v.setMinWidth(dp(48));
         s.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             public void onProgressChanged(SeekBar b, int p, boolean u) { v.setText(String.valueOf(p + min)); }
