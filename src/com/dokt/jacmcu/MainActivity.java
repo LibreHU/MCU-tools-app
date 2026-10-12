@@ -41,9 +41,46 @@ import java.util.Locale;
 import java.util.Map;
 
 public final class MainActivity extends Activity implements Backend.Listener {
-    static final int BG = 0xFF101114, CARD = 0xFF1B1D21, CARD_HI = 0xFF282B30, ACCENT = 0xFFA8C7FA,
+    // Palette : sombre par defaut, claire et accent repris de LibreHU Launcher quand il est installe (applyTheme).
+    static int BG = 0xFF101114, CARD = 0xFF1B1D21, CARD_HI = 0xFF282B30, ACCENT = 0xFFA8C7FA,
             OK = 0xFFB7F0D0, BAD = 0xFFFFB4AB, WARN = 0xFFFFD8A8, TXT = 0xFFF4F5F7, DIM = 0xFF9AA0A8,
-            SIM = 0xFFD7BAFF;
+            SIM = 0xFFD7BAFF, ON_ACCENT = 0xFF111318, OK_BG = 0xFF21372F, WARN_BG = 0xFF3A3124,
+            ACCENT_BG = 0xFF23313F, LOG_BG = 0xFF0A0D10, SIM_BG = 0xFF2A2436;
+
+    /** Theme de LibreHU Launcher (content://org.librehu.launcher.theme/theme : dark 0/1, accent ARGB), sinon sombre. */
+    static void applyTheme(android.content.Context c) {
+        boolean dark = true;
+        int accent = 0;
+        android.database.Cursor q = null;
+        try {
+            q = c.getContentResolver().query(android.net.Uri.parse("content://org.librehu.launcher.theme/theme"), null, null, null, null);
+            if (q != null && q.moveToFirst()) {
+                dark = q.getInt(0) != 0;
+                accent = q.getInt(1);
+            }
+        } catch (Exception e) {
+            // lanceur absent : theme sombre d'origine
+        } finally {
+            if (q != null) q.close();
+        }
+        if (dark) {
+            BG = 0xFF101114; CARD = 0xFF1B1D21; CARD_HI = 0xFF282B30; ACCENT = accent != 0 ? accent : 0xFFA8C7FA;
+            OK = 0xFFB7F0D0; BAD = 0xFFFFB4AB; WARN = 0xFFFFD8A8; TXT = 0xFFF4F5F7; DIM = 0xFF9AA0A8; SIM = 0xFFD7BAFF;
+            ON_ACCENT = 0xFF111318; OK_BG = 0xFF21372F; WARN_BG = 0xFF3A3124; LOG_BG = 0xFF0A0D10; SIM_BG = 0xFF2A2436;
+        } else {
+            BG = 0xFFF1F3F4; CARD = 0xFFFFFFFF; CARD_HI = 0xFFE8EAED; ACCENT = accent != 0 ? accent : 0xFF1A73E8;
+            OK = 0xFF188038; BAD = 0xFFD93025; WARN = 0xFFB06000; TXT = 0xFF202124; DIM = 0xFF5F6368; SIM = 0xFF9334E6;
+            ON_ACCENT = 0xFFFFFFFF; OK_BG = 0xFFE6F4EA; WARN_BG = 0xFFFEF7E0; LOG_BG = 0xFFF8F9FA; SIM_BG = 0xFFF3E8FD;
+        }
+        ACCENT_BG = blend(CARD, ACCENT, 0.25f);
+    }
+
+    static int blend(int a, int b, float f) {
+        int r = (int) (((a >> 16) & 0xFF) * (1 - f) + ((b >> 16) & 0xFF) * f);
+        int g = (int) (((a >> 8) & 0xFF) * (1 - f) + ((b >> 8) & 0xFF) * f);
+        int bl = (int) ((a & 0xFF) * (1 - f) + (b & 0xFF) * f);
+        return 0xFF000000 | (r << 16) | (g << 8) | bl;
+    }
 
     private final Handler ui = new Handler(Looper.getMainLooper());
     private SharedPreferences prefs;
@@ -68,6 +105,7 @@ public final class MainActivity extends Activity implements Backend.Listener {
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        applyTheme(this);
         prefs = getSharedPreferences("jacmcu", MODE_PRIVATE);
         I18n.setLang(prefs.getString("lang", "auto"));
         setContentView(buildUi());
@@ -137,7 +175,7 @@ public final class MainActivity extends Activity implements Backend.Listener {
             if (status == null) return;
             status.setText((lastStatusOk ? "●  " : "○  ") + lastStatusText);
             status.setTextColor(lastStatusOk ? OK : WARN);
-            status.setBackgroundDrawable(pill(lastStatusOk ? 0xFF21372F : 0xFF3A3124));
+            status.setBackgroundDrawable(pill(lastStatusOk ? OK_BG : WARN_BG));
         }
     };
 
@@ -146,7 +184,7 @@ public final class MainActivity extends Activity implements Backend.Listener {
         if (status == null || label == null || label.length() == 0) return;
         status.setText("▶  " + label);
         status.setTextColor(ACCENT);
-        status.setBackgroundDrawable(pill(0xFF23313F));
+        status.setBackgroundDrawable(pill(ACCENT_BG));
         ui.removeCallbacks(restoreStatus);
         ui.postDelayed(restoreStatus, 1800);
     }
@@ -355,7 +393,7 @@ public final class MainActivity extends Activity implements Backend.Listener {
             boolean sel = i == k;
             pages[i].setVisibility(sel ? View.VISIBLE : View.GONE);
             tabs[i].setBackgroundDrawable(ripple(sel ? ACCENT : CARD_HI));
-            tabs[i].setTextColor(sel ? 0xFF111318 : TXT);
+            tabs[i].setTextColor(sel ? ON_ACCENT : TXT);
             tabs[i].setTypeface(sel ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
         }
         if (k == tabs.length - 1) refreshInfo();
@@ -516,7 +554,7 @@ public final class MainActivity extends Activity implements Backend.Listener {
         HorizontalScrollView hs = new HorizontalScrollView(this);
         hs.addView(logView);
         logScroll = new ScrollView(this);
-        logScroll.setBackgroundDrawable(round(0xFF0A0D10, 8));
+        logScroll.setBackgroundDrawable(round(LOG_BG, 8));
         logScroll.setPadding(dp(8), dp(6), dp(8), dp(6));
         logScroll.addView(hs);
         p.addView(logScroll, new LinearLayout.LayoutParams(-1, 0, 1));
@@ -609,7 +647,7 @@ public final class MainActivity extends Activity implements Backend.Listener {
 
     private Button simBtn(String s, final int cmd, final int... data) {
         Button b = button(s, new View.OnClickListener() { public void onClick(View v) { simulate(cmd, data); } });
-        b.setBackgroundDrawable(ripple(0xFF2A2436));
+        b.setBackgroundDrawable(ripple(SIM_BG));
         return b;
     }
 
