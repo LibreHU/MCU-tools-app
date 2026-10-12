@@ -3,6 +3,15 @@
 Lit l'état du MCU, envoie des commandes et affiche le trafic série. Le protocole est décrit dans
 [`docs/mcu_firmware.md`](docs/mcu_firmware.md).
 
+## Captures d'écran
+
+| | |
+|---|---|
+| ![État](docs/screenshots/main.png)<br>État | ![Commandes](docs/screenshots/commands.png)<br>Commandes |
+| ![Console](docs/screenshots/console.png)<br>Console | ![Simulation](docs/screenshots/simulation.png)<br>Simulation |
+
+Captures sur l'émulateur Android 11 (1280×720, 160 dpi comme l'autoradio), sans autoradio branché : les valeurs du véhicule et de la MCU sont vides. Refaites-les avec l'action **Screenshots** de [LibreHU-OTA-app](https://github.com/LibreHU/LibreHU-OTA-app/tree/main/screenshots).
+
 ## Modes
 | | Service Jancar (sans root) | Root |
 |---|---|---|
