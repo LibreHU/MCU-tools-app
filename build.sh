@@ -2,13 +2,14 @@
 # Build de JacMCU sans Gradle : clang (jacbridge) + aapt2 + javac + d8/dx + jarsigner -> out/JacMCU.apk
 # Avec un SDK Android : ANDROID_HOME (build-tools + platforms/android-28) suffit.
 # Sinon : ANDROID_JAR=.../android.jar  AAPT2=.../aapt2  et  D8=.../d8  ou  DX_JAR=.../dx.jar
-# Signature : KEYSTORE (defaut ./jacmcu.keystore, cree au besoin, non versionne), mot de passe KS_PASS (defaut android).
+# Signature : KEYSTORE (defaut ./jacmcu.keystore, cree au besoin, non versionne), mot de passe KS_PASS (defaut android),
+# alias KS_ALIAS (defaut jacmcu). La CI signe avec la cle commune des applis LibreHU (keystore/librehu.jks).
 set -e
 cd "$(dirname "$0")"
 # Versionnement derive de git : code = nombre de commits (monotone), nom = dernier tag + distance.
 # Surchargeable par les variables d'environnement VERSION_CODE / VERSION_NAME.
 VERSION_CODE=${VERSION_CODE:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}
-VERSION_NAME=${VERSION_NAME:-$(git describe --tags --always --dirty 2>/dev/null || echo 0.0.0)}
+VERSION_NAME=${VERSION_NAME:-$(git describe --tags --always --dirty --exclude 'latest-*' 2>/dev/null || echo 0.0.0)}
 echo "Version : $VERSION_NAME (code $VERSION_CODE)"
 
 if [ -n "$ANDROID_HOME" ]; then
@@ -49,14 +50,15 @@ python3 apkpack.py merge $OUT/base.apk $OUT/unsigned.apk $OUT/stage
 echo "[6/6] signature"
 KEYSTORE=${KEYSTORE:-jacmcu.keystore}
 KS_PASS=${KS_PASS:-android}
-[ -f "$KEYSTORE" ] || keytool -genkeypair -keystore "$KEYSTORE" -alias jacmcu -keyalg RSA -keysize 2048 -validity 10000 \
+KS_ALIAS=${KS_ALIAS:-jacmcu}
+[ -f "$KEYSTORE" ] || keytool -genkeypair -keystore "$KEYSTORE" -alias "$KS_ALIAS" -keyalg RSA -keysize 2048 -validity 10000 \
 	-storepass "$KS_PASS" -keypass "$KS_PASS" -dname "CN=JacMCU, O=Dok-T" 2>/dev/null
 if [ -n "$APKSIGNER" ]; then
 	python3 apkpack.py align $OUT/unsigned.apk $OUT/aligned.apk
 	"$APKSIGNER" sign --ks "$KEYSTORE" --ks-pass "pass:$KS_PASS" --out $OUT/JacMCU.apk $OUT/aligned.apk
 else
 	jarsigner -keystore "$KEYSTORE" -storepass "$KS_PASS" -sigalg SHA256withRSA -digestalg SHA-256 \
-		$OUT/unsigned.apk jacmcu >/dev/null
+		$OUT/unsigned.apk "$KS_ALIAS" >/dev/null
 	python3 apkpack.py align $OUT/unsigned.apk $OUT/JacMCU.apk
 fi
 ls -l $OUT/JacMCU.apk

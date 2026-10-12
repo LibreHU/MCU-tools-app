@@ -41,11 +41,14 @@ jobs:
 
       - name: Version (git)
         id: ver
-        run: echo "name=$(git describe --tags --always --dirty)" >> "$GITHUB_OUTPUT"
+        run: echo "name=$(git describe --tags --always --dirty --exclude 'latest-*')" >> "$GITHUB_OUTPUT"
 
       - name: Build (build.sh)
         env:
-          KS_PASS: android
+          # Cle commune des applis LibreHU : une mise a jour s'installe par-dessus la precedente (LibreHU OTA).
+          KEYSTORE: keystore/librehu.jks
+          KS_PASS: librehu
+          KS_ALIAS: librehu
         run: ./build.sh
 
       - name: Renomme l'APK avec la version
@@ -64,3 +67,28 @@ jobs:
         with:
           files: out/MCU-Toolkit-${{ steps.ver.outputs.name }}.apk
           generate_release_notes: true
+
+      - name: Release continue de la branche (LibreHU OTA)
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          # Une pre-release par branche (tag latest-<branche>), APK MCU-Toolkit-<branche>.apk ; les notes portent la
+          # version lue par LibreHU OTA (versionCode = nombre de commits, comme build.sh).
+          SLUG="${BRANCH//\//-}"
+          TAG="latest-$SLUG"
+          OUT="MCU-Toolkit-$SLUG.apk"
+          cp out/JacMCU.apk "$OUT"
+          CODE=$(git rev-list --count HEAD)
+          NAME=$(git describe --tags --always --exclude 'latest-*')
+          printf 'versionCode=%s\nversionName=%s\nbranch=%s\ncommit=%s\n\n%s\n' \
+            "$CODE" "$NAME" "$BRANCH" "$GITHUB_SHA" "$(git log -1 --pretty=%s)" > notes.txt
+          git tag -f "$TAG" "$GITHUB_SHA"
+          git push -f origin "refs/tags/$TAG"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "MCU Toolkit $NAME ($BRANCH)" --notes-file notes.txt --prerelease
+          else
+            gh release create "$TAG" --title "MCU Toolkit $NAME ($BRANCH)" --notes-file notes.txt --prerelease --verify-tag
+          fi
+          gh release upload "$TAG" "$OUT" --clobber
