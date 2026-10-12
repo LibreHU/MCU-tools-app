@@ -9,7 +9,7 @@ cd "$(dirname "$0")"
 # Versionnement derive de git : code = nombre de commits (monotone), nom = dernier tag + distance.
 # Surchargeable par les variables d'environnement VERSION_CODE / VERSION_NAME.
 VERSION_CODE=${VERSION_CODE:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}
-VERSION_NAME=${VERSION_NAME:-$(git describe --tags --always --dirty --exclude 'latest-*' 2>/dev/null || echo 0.0.0)}
+VERSION_NAME=${VERSION_NAME:-$(git describe --tags --always --dirty --exclude 'latest-*' --exclude 'build-*' 2>/dev/null || echo 0.0.0)}
 echo "Version : $VERSION_NAME (code $VERSION_CODE)"
 
 if [ -n "$ANDROID_HOME" ]; then
