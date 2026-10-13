@@ -92,7 +92,10 @@ jobs:
           else
             gh release create "$TAG" --title "MCU Toolkit $NAME ($BRANCH)" --notes-file notes.txt --prerelease --verify-tag
           fi
-          gh release upload "$TAG" "$OUT" --clobber
+          # Les memes notes avec le nom et la taille de l'APK, en fichier de la release : LibreHU Apps le lit comme un
+          # telechargement, qui ne compte pas dans la limite de l'API GitHub (60 requetes par heure sans compte).
+          { printf 'apk=%s\nsize=%s\ndate=%s\n' "$OUT" "$(stat -c %s "$OUT")" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"; cat notes.txt; } > release.txt
+          gh release upload "$TAG" "$OUT" release.txt --clobber
           # Numbered copy of this build, so that LibreHU OTA can install an older version; the last 15 per branch kept.
           BTAG="build-$SLUG-$CODE"
           if ! gh release view "$BTAG" >/dev/null 2>&1; then
