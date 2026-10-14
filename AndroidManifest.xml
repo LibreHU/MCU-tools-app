@@ -20,5 +20,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- Premier demarrage de LibreHU Launcher : root demande pour toutes les applis LibreHU d'un coup. -->
+        <receiver
+            android:name=".RootRequestReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="org.librehu.action.REQUEST_ROOT" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>
