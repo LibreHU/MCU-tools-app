@@ -31,27 +31,31 @@ public final class RootRequestReceiver extends BroadcastReceiver {
         last = now;
         final Context app = context.getApplicationContext();
         final PendingResult pending = goAsync();
-        new Thread(() -> {
-            boolean granted = false;
-            try {
-                Process p = new ProcessBuilder("su", "-c", "id").redirectErrorStream(true).start();
-                p.getOutputStream().close();
-                // SuperSU attend la reponse ; une diffusion en arriere-plan a jusqu'a une minute.
-                boolean done = p.waitFor(50, TimeUnit.SECONDS);
-                if (!done) {
-                    p.destroy();
-                } else {
-                    BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()));
-                    String line;
-                    while ((line = r.readLine()) != null) if (line.contains("uid=0")) granted = true;
+        // Pas de lambda : la compilation sans Gradle (javac + android.jar) n'a pas LambdaMetafactory.
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                boolean granted = false;
+                try {
+                    Process p = new ProcessBuilder("su", "-c", "id").redirectErrorStream(true).start();
+                    p.getOutputStream().close();
+                    // SuperSU attend la reponse ; une diffusion en arriere-plan a jusqu'a une minute.
+                    boolean done = p.waitFor(50, TimeUnit.SECONDS);
+                    if (!done) {
+                        p.destroy();
+                    } else {
+                        BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()));
+                        String line;
+                        while ((line = r.readLine()) != null) if (line.contains("uid=0")) granted = true;
+                    }
+                } catch (Exception ignored) {
                 }
-            } catch (Exception ignored) {
-            }
-            try {
-                app.sendBroadcast(new Intent(ACTION_RESULT).setPackage(replyTo)
-                        .putExtra("package", app.getPackageName()).putExtra("granted", granted));
-            } finally {
-                pending.finish();
+                try {
+                    app.sendBroadcast(new Intent(ACTION_RESULT).setPackage(replyTo)
+                            .putExtra("package", app.getPackageName()).putExtra("granted", granted));
+                } finally {
+                    pending.finish();
+                }
             }
         }, "librehu-root").start();
     }
