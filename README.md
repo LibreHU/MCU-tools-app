@@ -84,6 +84,17 @@ dupliquer la table `EN` et l'aiguiller dans `setLang()`.
 Copiés depuis [android_device_alps_ac8257_demo](https://github.com/LibreHU/android_device_alps_ac8257_demo)
 (commit `917417c`), où se trouvent aussi `touchfix` et l'intégration TWRP.
 
+## Licence
+
+Copyright (C) 2026 les contributeurs de LibreHU.
+
+Le code de ce dépôt est sous **GNU AGPL v3 ou ultérieure** (`AGPL-3.0-or-later`, fichier [`LICENSE`](LICENSE)), avec les
+[termes additionnels](LICENSE-ADDITIONAL-TERMS.md) de son article 7 : garder la mention « Basé sur LibreHU –
+https://github.com/LibreHU » et marquer une version modifiée comme telle. Qui distribue une version modifiée, ou la
+fait utiliser à distance, doit en donner le code source complet sous la même licence.
+
+Aucun code d'autres projets.
+
 ## Contact
 
 [librehu@proton.me](mailto:librehu@proton.me)
