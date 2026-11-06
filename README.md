@@ -83,3 +83,7 @@ dupliquer la table `EN` et l'aiguiller dans `setLang()`.
 
 Copiés depuis [android_device_alps_ac8257_demo](https://github.com/LibreHU/android_device_alps_ac8257_demo)
 (commit `917417c`), où se trouvent aussi `touchfix` et l'intégration TWRP.
+
+## Contact
+
+[librehu@proton.me](mailto:librehu@proton.me)
