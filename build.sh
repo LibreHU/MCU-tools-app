@@ -22,11 +22,15 @@ fi
 for v in ANDROID_JAR AAPT2; do eval "x=\$$v"; [ -e "$x" ] || { echo "$v introuvable ($x)"; exit 1; }; done
 
 OUT=out
-rm -rf $OUT; mkdir -p $OUT/classes $OUT/stage/lib/arm64-v8a
+rm -rf $OUT; mkdir -p $OUT/classes $OUT/stage/lib/arm64-v8a $OUT/stage/lib/armeabi-v7a
 
-echo "[1/6] jacbridge (aarch64)"
+# Deux ABI dans l'APK : Android installe celle de l'appareil (arm64-v8a sur un systeme 64 bits, armeabi-v7a sur un 32 bits).
+echo "[1/6] jacbridge (aarch64 + armv7)"
 clang --target=aarch64-linux-gnu -O2 -ffreestanding -fno-stack-protector -nostdlib -static -fno-builtin \
       -fuse-ld=lld -Wl,-e,_start -o $OUT/stage/lib/arm64-v8a/libjacbridge.so native/jacbridge.c
+# armv7 : mode ARM (r7 libre pour le numero d'appel systeme), sans instruction flottante ni NEON (tout processeur ARMv7).
+clang --target=armv7a-linux-gnueabi -marm -mfloat-abi=soft -O2 -ffreestanding -fno-stack-protector -nostdlib -static \
+      -fno-builtin -fuse-ld=lld -Wl,-e,_start -o $OUT/stage/lib/armeabi-v7a/libjacbridge.so native/jacbridge.c
 
 echo "[2/6] ressources"
 "$AAPT2" compile --dir res -o $OUT/res.zip

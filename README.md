@@ -53,7 +53,7 @@ au paquet indiqué dans `reply_to`. Rien d'autre que `id` n'est lancé ; une sec
 ```sh
 ./build.sh                    # ANDROID_HOME, ou ANDROID_JAR + AAPT2 + (D8 | DX_JAR)
 ```
-Sortie : `out/JacMCU.apk` (arm64, Android 6+, cible API 28). La clé de signature
+Sortie : `out/JacMCU.apk` (arm64 et armv7 32 bits, Android 6+, cible API 28). La clé de signature
 `jacmcu.keystore` est créée au premier build et n'est pas versionnée : garder la même pour les mises à jour.
 
 ## Versions

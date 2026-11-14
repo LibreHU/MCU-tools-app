@@ -1,5 +1,9 @@
 # Changelog
 
+## Non publié
+- **32 bits** : `jacbridge` (mode root) compilé aussi en armv7 (`lib/armeabi-v7a`) ; l'APK s'installe et le mode root
+  fonctionne sur un Android 32 bits. Sur un Android 64 bits, Android garde le binaire arm64, inchangé.
+
 ## v1.0.0
 - App Android **MCU Toolkit** (ex-JacMCU) : états, commandes, console du MCU Jancar (modes service Jancar / root).
 - Onglet **Simulation** : injection locale de trames MCU → SoC (sans écriture sur le port).

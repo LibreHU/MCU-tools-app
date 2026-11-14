@@ -9,6 +9,7 @@ import java.io.OutputStream;
 
 /**
  * Mode root : ecriture directe sur /dev/ttyS1 par le binaire jacbridge (lib/arm64-v8a/libjacbridge.so) lance via su.
+ * Sur un systeme 32 bits, Android installe lib/armeabi-v7a/libjacbridge.so a la place (meme chemin nativeLibraryDir).
  * ivi-services garde le port : chaque trame part en UN seul write() (pas d'entrelacement), le port n'est pas reconfigure,
  * l'ACK du MCU est lu par ivi-services. Lecture :
  *   - par defaut passive, via le journal d'ivi-services (logcat JLOG, reglage global_mcudatadebug) ;
